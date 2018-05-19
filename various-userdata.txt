@@ -1,0 +1,75 @@
+T-L1
+
+#!/bin/bash -ex
+yum -y update
+yum -y install httpd php mysql php-mysql
+chkconfig httpd on
+/etc/init.d/httpd start
+if [ ! -f /var/www/html/lab2-app.tar.gz ]; then
+cd /var/www/html
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-ESS/v4.1/lab-2-configure-website-datastore/scripts/lab2-app.tar.gz
+tar xvfz lab2-app.tar.gz
+chown apache:root /var/www/html/rds.conf.php
+fi
+
+T - L3
+
+#!/bin/bash -ex 
+yum -y update
+yum -y install httpd php mysql php-mysql
+chkconfig httpd on
+/etc/init.d/httpd start
+if [ ! -f /var/www/html/lab2-app.tar.gz ]; then
+cd /var/www/html
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-ESS/v4.1/lab-2-configure-website-datastore/scripts/lab2-app.tar.gz
+tar xvfz lab2-app.tar.gz
+chown apache:root /var/www/html/rds.conf.php
+fi
+
+
+S-L1
+
+#!/bin/bash
+wget -q --tries=10 --timeout=20 http://google.com
+yum update -y
+yum -y install httpd php
+chkconfig httpd on
+/etc/init.d/httpd start
+cd /var/www/html
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-1-compute-linux/scripts/ec2-info.zip
+unzip ec2-info.zip
+echo 'UserData has been successfully executed. ' >> /home/ec2-user/result
+
+
+S-L2 NAT
+
+#!/bin/sh
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 0 > /proc/sys/net/ipv4/conf/eth0/send_redirects
+/sbin/iptables -t nat -A POSTROUTING -o eth0 -s 0.0.0.0/0 -j MASQUERADE
+/sbin/iptables-save > /etc/sysconfig/iptables
+mkdir -p /etc/sysctl.d/
+cat <<EOF > /etc/sysctl.d/nat.conf
+net.ipv4.ip_forward = 1
+net.ipv4.conf.eth0.send_redirects = 0
+EOF
+
+
+S-L6 AutoScaling
+
+#!/bin/bash
+yum update -y --security
+yum -y install httpd php stress
+chkconfig httpd on
+/etc/init.d/httpd start
+cd /var/www/html
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-6-scaling-linux/scripts/ec2-stress.zip
+unzip ec2-stress.zip
+
+echo 'UserData has been successfully executed. ' >> /home/ec2-user/result
+find -wholename /root/.*history -wholename /home/*/.*history -exec rm -f {} \;
+find / -name 'authorized_keys' -exec rm -f {} \;
+rm -rf /var/lib/cloud/data/scripts/*
+
+
+

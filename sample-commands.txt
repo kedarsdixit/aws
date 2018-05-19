@@ -1,0 +1,378 @@
+https://s3.amazonaws.com/kinesis-demo-bucket/amazon-kinesis-data-visualization-sample/kinesis-data-vis-sample-app.template
+
+
+
+
+https://docs.google.com/spreadsheets/d/1r87wXwK1gpy91L6EHYpXus4TUE9ek3eyRCJtoIMaG_Y/edit?usp=sharing
+
+Lambda function to stop instances if the AutoOff tag is True.
+
+import boto3
+import logging
+
+#setup simple logging for INFO
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+#define the connection
+ec2 = boto3.resource('ec2')
+
+def lambda_handler(event, context):
+    # Use the filter() method of the instances collection to retrieve
+    # all running EC2 instances.
+    filters = [{
+            'Name': 'tag:AutoOff',
+            'Values': ['True']
+        },
+        {
+            'Name': 'instance-state-name', 
+            'Values': ['running']
+        }
+    ]
+    
+    #filter the instances
+    instances = ec2.instances.filter(Filters=filters)
+
+    #locate all running instances
+    RunningInstances = [instance.id for instance in instances]
+    
+    #print the instances for logging purposes
+    #print RunningInstances 
+    
+    #make sure there are actually instances to shut down. 
+    if len(RunningInstances) > 0:
+        #perform the shutdown
+        shuttingDown = ec2.instances.filter(InstanceIds=RunningInstances).stop()
+        print shuttingDown
+    else:
+        print "Nothing to see here"
+        
+
+
+Stop instances that dont have a tag
+
+import boto3
+import logging
+
+#setup simple logging for INFO
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+#define the connection
+ec2 = boto3.resource('ec2')
+# open connection to ec2
+#conn = get_ec2_conn()
+
+# get a list of all instances
+all_instances = [i for i in ec2.instances.all()]
+
+def lambda_handler(event, context):
+
+    #instances = ec2.instances.filter(Filters=filters)
+    # get instances with filter of running + with tag `Name`
+    instances = [i for i in ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}, {'Name':'tag:AutoOff', 'Values':['False']}])]
+
+    # make a list of filtered instances IDs `[i.id for i in instances]`
+    # Filter from all instances the instance that are not in the filtered list
+    instances_to_delete = [to_del for to_del in all_instances if to_del.id not in [i.id for i in instances]]
+
+    # run over your `instances_to_delete` list and terminate each one of them
+    for instance in instances_to_delete:
+        instance.stop()
+
+        
+      
+Auto Scaleing User data
+
+<powershell>
+Set-ExecutionPolicy Unrestricted -Force
+New-Item -ItemType directory -Path 'C:\temp'
+
+# Install IIS and Web Management Tools.
+Import-Module ServerManager
+install-windowsfeature web-server, web-webserver -IncludeAllSubFeature
+install-windowsfeature web-mgmt-tools
+
+# Download the files for our web application.
+Set-Location -Path C:\inetpub\wwwroot
+
+$shell_app = new-object -com shell.application
+(New-Object System.Net.WebClient).DownloadFile("https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-6-scaling-windows/scripts/stressapp.zip", (Get-Location).Path + "\stressapp.zip")
+
+$zipfile = $shell_app.Namespace((Get-Location).Path + "\stressapp.zip")
+$destination = $shell_app.Namespace((Get-Location).Path)
+$destination.copyHere($zipfile.items())
+
+# Create the web app in IIS8.
+New-WebApplication -Name stressapp -PhysicalPath c:\inetpub\wwwroot\stressapp -Site "Default Web Site" -force
+
+# Download consume.exe for emulating load generation.
+(new-object net.webclient).DownloadFile('https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-6-scaling-windows/scripts/consume.exe', 'c:\temp\consume.exe')
+</powershell>
+
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T03:00:05Z --value 87 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T03:00:10Z --value 51 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T03:00:15Z --value 125 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T03:00:20Z --value 235 --unit Milliseconds
+
+
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T04:00:00Z --value 87 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T04:00:00Z --value 51 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T04:00:00Z --value 125 --unit Milliseconds
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T04:00:00Z --value 235 --unit Milliseconds
+
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--timestamp 2018-03-13T05:00:00Z --statistic-values Sum=577,Minimum=65,Maximum=189,SampleCount=5 --unit Milliseconds
+
+aws cloudwatch put-metric-data --metric-name RequestLatency --namespace GetStarted \
+--statistic-values Sum=806,Minimum=47,Maximum=328,SampleCount=6 --unit Milliseconds
+
+
+https://s3.ap-south-1.amazonaws.com/training-artifacts-m/static-web.zip
+
+aws ec2 create-tags --resources i-0d5ffa01c386f0ce5 --tags Key=Name,Value=Processor
+
+aws ec2 describe-instances --filter 'Name=tag:Name,Values=Processor'
+
+aws ec2 describe-instances --filter 'Name=tag:Name,Values=Processor' --query 'Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.{VolumeId:VolumeId}'
+
+aws ec2 describe-instances --filters 'Name=tag:Name,Values=Processor' --query 'Reservations[0].Instances[0].InstanceId'
+
+aws ec2 stop-instances --instance-ids <instance-id>
+
+aws ec2 describe-instance-status --instance-id <instance-id>
+
+aws ec2 create-snapshot --volume-id <volume-id>
+
+aws ec2 describe-snapshots --snapshot-id <snapshot-id>
+
+aws ec2 start-instances --instance-ids <instance-id>
+
+aws ec2 describe-instance-status --instance-id <instance-id>
+
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-3-storage-linux/scripts/loggen.sh
+
+chmod 740 loggen.sh
+
+./loggen.sh &
+
+tail timestamp.log
+
+aws s3 mv timestamp.log s3://<s3-bucket-name>/logfiles/timestamp-`date +"%m-%d-%Y-%H.%M.%S"`.log
+
+aws s3 mv timestamp.log s3://<s3-bucket-name>/logfiles/timestamp-`date +"%m-%d-%Y-%H.%M.%S"`.log
+
+aws s3 ls s3://<s3-bucket-name>
+
+aws s3 ls s3://<s3-bucket-name>/logfiles/
+
+aws s3 mv s3://<s3-bucket-name>/logfiles/<file-name> s3://<s3-bucket-name>/logfiles/archive/<file-name>
+
+aws s3 ls s3://<s3-bucket-name>/logfiles/
+
+Configuring Amazon Glacier Lifecycle Policy For logfiles
+
+rule name: /logfiles/archive
+filter prefix: /logfiles/archive
+
+previous version
+transition previous versions to glacier after 30 days
+expire previous versions after 120 days
+select Permanently delete previous version.
+
+Synchronize Files With Amazon S3
+
+wget https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-3-storage-linux/scripts/files.zip
+
+Hint based challenge
+
+- Activate versioning for your Amazon S3 bucket
+aws s3api put-bucket-versioning 
+
+- Use a single AWS CLI command to synchronize (sync) the contents of your unzipped folder with your Amazon S3 bucket
+
+aws s3 sync
+
+- To force Amazon S3 to delete any files not present on the local drive but present in Amazon S3, 
+
+use the `--delete` option to `aws s3 sync`
+
+- Recover the deleted file from Amazon S3 using versioning.
+
+- Because there is no direct command in Amazon S3 to restore an old version of a file, to download the old version of the deleted file from Amazon S3, 
+use the `aws s3api list-object-versions` and `aws s3api get-object` commands. 
+You can then restore the file to Amazon S3 by using another call to `aws s3 sync`.
+
+
+1.
+aws s3api put-bucket-versioning --bucket <s3-bucket-name> --versioning-configuration Status=Enabled
+
+aws s3 sync files s3://<s3-bucket-name>/files/
+
+aws s3 ls s3://<s3-bucket-name>/files/
+
+rm files/file1.txt
+
+aws s3 sync files s3://<s3-bucket-name>/files/ --delete
+
+aws s3 ls s3://<s3-bucket-name>/files/
+
+aws s3api list-object-versions --bucket <s3-bucket-name> --prefix files/file1.txt
+
+aws s3api get-object --bucket <s3-bucket-name> --key files/file1.txt --version-id <version-id> files/file1.txt
+
+ls files
+
+aws s3 sync files s3://<s3-bucket-name>/files/
+
+aws s3 ls s3://<s3-bucket-name>/files/
+
+Congratulations!!
+	
+Create instance and AMI
+
+aws ec2 run-instances --key-name <key-name> --instance-type t2.micro --image-id <ami-id> --user-data file://c:\temp\UserData.txt --security-group-ids <sg-id> --subnet-id <subnet-id> --associate-public-ip-address
+
+aws ec2 describe-instance-status --instance-id <new-instance-id>
+
+aws ec2 describe-instances --instance-id <new-instance-id> --query 'Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicDnsName'
+
+
+(new-object net.webclient).DownloadString('http://<public-dns-name>/stressapp/Default')
+
+aws ec2 create-image --name WebServer --instance-id <new-instance-id>
+
+
+UserData.txt
+<powershell>
+Set-ExecutionPolicy Unrestricted -Force
+New-Item -ItemType directory -Path 'C:\temp'
+
+# Install IIS and Web Management Tools.
+Import-Module ServerManager
+install-windowsfeature web-server, web-webserver -IncludeAllSubFeature
+install-windowsfeature web-mgmt-tools
+
+# Download the files for our web application.
+Set-Location -Path C:\inetpub\wwwroot
+
+$shell_app = new-object -com shell.application
+(New-Object System.Net.WebClient).DownloadFile("https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-6-scaling-windows/scripts/stressapp.zip", (Get-Location).Path + "\stressapp.zip")
+
+$zipfile = $shell_app.Namespace((Get-Location).Path + "\stressapp.zip")
+$destination = $shell_app.Namespace((Get-Location).Path)
+$destination.copyHere($zipfile.items())
+
+# Create the web app in IIS8.
+New-WebApplication -Name stressapp -PhysicalPath c:\inetpub\wwwroot\stressapp -Site "Default Web Site" -force
+
+# Download consume.exe for emulating load generation.
+(new-object net.webclient).DownloadFile('https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-6-scaling-windows/scripts/consume.exe', 'c:\temp\consume.exe')
+</powershell>
+
+Working with AWS CLI/ Using Tags
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem"
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" --query 'Reservations[*].Instances[*].InstanceId'
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" --query 'Reservations[*].Instances[*].{ID:InstanceId,AZ:Placement.AvailabilityZone}'
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" --query 'Reservations[*].Instances[*].{ID:InstanceId,AZ:Placement.AvailabilityZone,Project:Tags[?Key==`Project`] | [0].Value}'
+
+aws ec2 describe-instances --filter  "Name=tag:Project,Values=ERPSystem" --query 'Reservations[*].Instances[*].{ID:InstanceId,AZ:Placement.AvailabilityZone,Project:Tags[?Key==`Project`] | [0].Value,Environment:Tags[?Key==`Environment`]   | [0].Value,Version:Tags[?Key==`Version`] | [0].Value}'
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" "Name=tag:Environment,Values=development" --query 'Reservations[*].Instances[*].{ID:InstanceId, AZ:Placement.AvailabilityZone, Project:Tags[?Key==`Project`] | [0].Value,Environment:Tags[?Key==`Environment`] | [0].Value, Version:Tags[?Key==`Version`] | [0].Value}'
+
+$instances = aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" "Name=tag:Environment, Values=development" --query 'Reservations[*].Instances[*].InstanceId' --output text
+$instances = $instances.split("\n")
+aws ec2 create-tags --resources $instances --tags 'Key=Version,Value=1.1'
+
+
+aws ec2 describe-instances --filter "Name=tag:Project,Values=ERPSystem" --query 'Reservations[*].Instances[*].{ID:InstanceId, AZ:Placement.AvailabilityZone, Project:Tags[?Key==`Project`] |[0].Value,Environment:Tags[?Key==`Environment`] | [0].Value,Version:Tags[?Key==`Version`] | [0].Value}'
+
+
+Lambda Function
+
+
+
+console.log('Loading event...');
+
+var json = {
+  "service": "lambda",
+  "reference": "https://aws.amazon.com/lambda/questions/",
+  "questions": [{
+    "q": "What is AWS Lambda?",
+    "a": "AWS Lambda lets you run code without provisioning or managing servers. You pay only for the compute time you consume - there is no charge when your code is not running. With Lambda, you can run code for virtually any type of application or backend service - all with zero administration. Just upload your code and Lambda takes care of everything required to run and scale your code with high availability. You can set up your code to automatically trigger from other AWS services or call it directly from any web or mobile app."
+  },{
+   "q":"What events can trigger an AWS Lambda function?",
+   "a":"You can use AWS Lambda to respond to table updates in Amazon DynamoDB, modifications to objects in Amazon S3 buckets, logs arriving in Amazon CloudWatch logs, incoming emails to Amazon Simple Email Service, notifications sent from Amazon SNS, messages arriving in an Amazon Kinesis stream, client data synchronization events in Amazon Cognito, and custom events from mobile applications, web applications, or other web services. You can also invoke a Lambda function on a defined schedule using the AWS Lambda console."
+  },{
+   "q":"When should I use AWS Lambda versus Amazon EC2?",
+   "a":"Amazon Web Services offers a set of compute services to meet a range of needs. Amazon EC2 offers flexibility, with a wide range of instance types and the option to customize the operating system, network and security settings, and the entire software stack, allowing you to easily move existing applications to the cloud. With Amazon EC2 you are responsible for provisioning capacity, monitoring fleet health and performance, and designing for fault tolerance and scalability. AWS Elastic Beanstalk offers an easy-to-use service for deploying and scaling web applications in which you retain ownership and full control over the underlying EC2 instances. Amazon EC2 Container Service is a scalable management service that supports Docker containers and allows you to easily run distributed applications on a managed cluster of Amazon EC2 instances. AWS Lambda makes it easy to execute code in response to events, such as changes to Amazon S3 buckets, updates to an Amazon DynamoDB table, or custom events generated by your applications or devices. With Lambda you do not have to provision your own instances; Lambda performs all the operational and administrative activities on your behalf, including capacity provisioning, monitoring fleet health, applying security patches to the underlying compute resources, deploying your code, running a web service front end, and monitoring and logging your code. AWS Lambda provides easy scaling and high availability to your code without additional effort on your part."
+  },{
+    "q":"What kind of code can run on AWS Lambda?",
+    "a":"AWS Lambda offers an easy way to accomplish many activities in the cloud. For example, you can use AWS Lambda to build mobile back-ends that retrieve and transform data from Amazon DynamoDB, handlers that compress or transform objects as they are uploaded to Amazon S3, auditing and reporting of API calls made to any Amazon Web Service, and server-less processing of streaming data using Amazon Kinesis."
+  },{
+    "q":"What languages does AWS Lambda support?",
+    "a":"AWS Lambda supports code written in Node.js (JavaScript), Python, and Java (Java 8 compatible). Your code can include existing libraries, even native ones. Lambda functions can easily launch processes using languages supported by Amazon Linux, including Bash, Go, and Ruby. Please read our documentation on using Node.js, Python and Java."
+  },{
+    "q":"Can I access the infrastructure that AWS Lambda runs on?",
+    "a":"No. AWS Lambda operates the compute infrastructure on your behalf, allowing it to perform health checks, apply security patches, and do other routine maintenance."
+  },{
+    "q":"How does AWS Lambda isolate my code?",
+    "a":"Each AWS Lambda function runs in its own isolated environment, with its own resources and file system view. AWS Lambda uses the same techniques as Amazon EC2 to provide security and separation at the infrastructure and execution levels."
+  },{
+    "q":"How does AWS Lambda secure my code?",
+    "a":"AWS Lambda stores code in Amazon S3 and encrypts it at rest. AWS Lambda performs additional integrity checks while your code is in use."
+  },{
+    "q":"What is an AWS Lambda function?",
+    "a":"The code you run on AWS Lambda is uploaded as a Lambda function. Each function has associated configuration information, such as its name, description, entry point, and resource requirements. The code must be written in a stateless style i.e. it should assume there is no affinity to the underlying compute infrastructure. Local file system access, child processes, and similar artifacts may not extend beyond the lifetime of the request, and any persistent state should be stored in Amazon S3, Amazon DynamoDB, or another Internet-available storage service. Lambda functions can include libraries, even native ones."
+  },{
+    "q":"Will AWS Lambda reuse function instances?",
+    "a":"To improve performance, AWS Lambda may choose to retain an instance of your function and reuse it to serve a subsequent request, rather than creating a new copy. Your code should not assume that this will always happen."
+  },{
+    "q":"What if I need scratch space on disk for my AWS Lambda function?",
+    "a":"Each Lambda function receives 500MB of non-persistent disk space in its own /tmp directory."
+  },{
+    "q":"Why must AWS Lambda functions be stateless?",
+    "a":"Keeping functions stateless enables AWS Lambda to rapidly launch as many copies of the function as needed to scale to the rate of incoming events. While AWS Lambda's programming model is stateless, your code can access stateful data by calling other web services, such as Amazon S3 or Amazon DynamoDB."
+  },{
+    "q":"Can I use threads and processes in my AWS Lambda function code?",
+    "a":"Yes. AWS Lambda allows you to use normal language and operating system features, such as creating additional threads and processes. Resources allocated to the Lambda function, including memory, execution time, disk, and network use, must be shared among all the threads/processes it uses. You can launch processes using any language supported by Amazon Linux."
+  },{
+    "q":"What restrictions apply to AWS Lambda function code?",
+    "a":"Lambda attempts to impose few restrictions on normal language and operating system activities, but there are a few activities that are disabled: Inbound network connections are managed by AWS Lambda, only TCP/IP sockets are supported, and ptrace (debugging) system calls are restricted. TCP port 25 traffic is also restricted as an anti-spam measure."
+  },{
+    "q":"How do I create an AWS Lambda function using the Lambda console?",
+    "a":"You can author the code for your function using the inline editor in the AWS Lambda console. You can also package the code (and any dependent libraries) as a ZIP and upload it using the AWS Lambda console from your local environment or specify an Amazon S3 location where the ZIP file is located. Uploads must be no larger than 50MB (compressed). You can use the AWS Eclipse plugin to author and deploy Lambda functions in Java and Node.js. If you are using Node.js, you can author the code for your function using the inline editor in the AWS Lambda console. Go to the console to get started."
+  },{
+    "q":"How do I create an AWS Lambda function using the Lambda CLI?",
+    "a":"You can package the code (and any dependent libraries) as a ZIP and upload it using the AWS CLI from your local environment, or specify an Amazon S3 location where the ZIP file is located. Uploads must be no larger than 50MB (compressed). Visit the Lambda Getting Started guide to get started."
+  },{
+    "q":"Which versions of Python are supported?",
+    "a":"Lambda provides a Python 2.7-compatible runtime to execute your Lambda functions. Lambda will include the latest AWS SDK for Python (boto3) by default."
+  },{
+    "q":"How do I compile my AWS Lambda function Java code?",
+    "a":"You can use standard tools like Maven or Gradle to compile your Lambda function. Your build process should mimic the same build process you would use to compile any Java code that depends on the AWS SDK. Run your Java compiler tool on your source files and include the AWS SDK 1.9 or later with transitive dependencies on your classpath. For more details, see our documentation."
+  },{
+    "q":"What is the JVM environment Lambda uses for execution of my function?",
+    "a":"Lambda provides the Amazon Linux build of openjdk 1.8."
+  }
+  ]
+}
+
+exports.handler = function(event, context) {
+    var rand = Math.floor(Math.random() * json.questions.length);
+    console.log("Quote selected: ", rand);
+    context.succeed(json.questions[rand]);
+};
+

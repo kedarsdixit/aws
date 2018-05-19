@@ -1,0 +1,346 @@
+{
+	"AWSTemplateFormatVersion" : "2010-09-09",
+	"Description" : "Managing Storage on AWS (Windows)",
+	"Parameters" : {
+		"VPCCIDR" : {
+			"Description" : "CIDR Block for VPC",
+			"Type" : "String",
+			"Default" : "10.5.0.0/16",
+			"AllowedValues" : ["10.5.0.0/16"]
+		},
+		"PublicSubnet1Param" : {
+			"Description" : "Public Subnet 1",
+			"Type" : "String",
+			"Default" : "10.5.0.0/24",
+			"AllowedValues" : ["10.5.0.0/24"]
+		},
+		"HostName" : {
+			"Type" : "String",
+			"Description" : "Unique Name for Your Host"
+		},
+		"KeyName" : {
+			"Type" : "String",
+			"Description" : "Keyname for the keypair that Qwiklab will use to launch EC2 instances",
+			"Default" : "MainKey"},
+		"AWSAmiId" : {
+			"Description" : "The name of the Windows AMI to find based on search",
+			"Type" : "String",
+			"Default" : "x86_64,Windows_Server-2012-R2_RTM-English-64Bit-Base"
+		},
+		"LabUrlPrefix" : {
+			"Type" : "String",
+			"Default" : "https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6"
+		}
+	},
+	"Mappings" : {
+		"AmazonLinuxAMI": {
+	      "us-east-1":      { "AMI": "ami-c58c1dd3" },
+	      "us-east-2":      { "AMI": "ami-4191b524" },
+	      "us-west-1":      { "AMI": "ami-7a85a01a" },
+	      "us-west-2":      { "AMI": "ami-4836a428" },
+	      "ca-central-1":   { "AMI": "ami-0bd66a6f" },
+	      "eu-west-1":      { "AMI": "ami-01ccc867" },
+	      "eu-west-2":      { "AMI": "ami-b6daced2" },
+	      "eu-central-1":   { "AMI": "ami-b968bad6" },
+	      "sa-east-1":      { "AMI": "ami-37cfad5b" },
+	      "ap-southeast-1": { "AMI": "ami-fc5ae39f" },
+	      "ap-southeast-2": { "AMI": "ami-162c2575" },
+	      "ap-south-1":     { "AMI": "ami-52c7b43d" },
+	      "ap-northeast-1": { "AMI": "ami-923d12f5" },
+	      "ap-northeast-2": { "AMI": "ami-9d15c7f3" }
+		}
+	},
+	"Resources" : {
+		"VPC" : {
+			"Type" : "AWS::EC2::VPC",
+			"Properties" : {
+				"CidrBlock" : {
+					"Ref" : "VPCCIDR"
+				},
+				"EnableDnsSupport" : "true",
+				"EnableDnsHostnames" : "true",
+				"Tags" : [{
+						"Key" : "VPC",
+						"Value" : "NAT-and-CLI"
+					}, {
+						"Key" : "Name",
+						"Value" : "Lab VPC"
+					}
+				]
+			}
+		},
+		"InternetGateway" : {
+			"Type" : "AWS::EC2::InternetGateway",
+			"DependsOn" : "VPC"
+		},
+		"AttachGateway" : {
+			"Type" : "AWS::EC2::VPCGatewayAttachment",
+			"DependsOn" : ["VPC", "InternetGateway"],
+			"Properties" : {
+				"VpcId" : {
+					"Ref" : "VPC"
+				},
+				"InternetGatewayId" : {
+					"Ref" : "InternetGateway"
+				}
+			}
+		},
+		"PublicSubnet1" : {
+			"Type" : "AWS::EC2::Subnet",
+			"DependsOn" : "AttachGateway",
+			"Properties" : {
+				"VpcId" : {
+					"Ref" : "VPC"
+				},
+				"CidrBlock" : {
+					"Ref" : "PublicSubnet1Param"
+				},
+				"MapPublicIpOnLaunch" : "true",
+				"AvailabilityZone" : {
+					"Fn::Select" : [
+						"0", {
+							"Fn::GetAZs" : ""
+						}
+					]
+				},
+				"Tags" : [{
+						"Key" : "Name",
+						"Value" : "Public Subnet 1"
+					}
+				]
+			}
+		},
+		"PublicRouteTable" : {
+			"Type" : "AWS::EC2::RouteTable",
+			"DependsOn" : ["VPC", "AttachGateway"],
+			"Properties" : {
+				"VpcId" : {
+					"Ref" : "VPC"
+				},
+				"Tags" : [{
+						"Key" : "Name",
+						"Value" : "Public"
+					}
+				]
+			}
+		},
+		"PublicRoute" : {
+			"Type" : "AWS::EC2::Route",
+			"DependsOn" : ["PublicRouteTable", "AttachGateway"],
+			"Properties" : {
+				"RouteTableId" : {
+					"Ref" : "PublicRouteTable"
+				},
+				"DestinationCidrBlock" : "0.0.0.0/0",
+				"GatewayId" : {
+					"Ref" : "InternetGateway"
+				}
+			}
+		},
+		"PublicSubnet1RouteTableAssociation" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"DependsOn" : ["PublicRouteTable", "PublicSubnet1", "AttachGateway"],
+			"Properties" : {
+				"SubnetId" : {
+					"Ref" : "PublicSubnet1"
+				},
+				"RouteTableId" : {
+					"Ref" : "PublicRouteTable"
+				}
+			}
+		},
+		"CLISecurityGroup" : {
+			"Type" : "AWS::EC2::SecurityGroup",
+			"DependsOn" : "AttachGateway",
+			"Properties" : {
+				"GroupDescription" : "Security Group for CommandHostInstance",
+				"VpcId" : {
+					"Ref" : "VPC"
+				},
+				"Tags" : [{
+						"Key" : "Name",
+						"Value" : "CLISecurityGroup"
+					}
+				],
+				"SecurityGroupEgress" : [{
+						"IpProtocol" : "tcp",
+						"FromPort" : "0",
+						"ToPort" : "65535",
+						"CidrIp" : "0.0.0.0/0"
+					}, {
+						"IpProtocol" : "udp",
+						"FromPort" : "0",
+						"ToPort" : "65535",
+						"CidrIp" : "0.0.0.0/0"
+					}
+				],
+				"SecurityGroupIngress" : [{
+						"IpProtocol" : "tcp",
+						"FromPort" : "3389",
+						"ToPort" : "3389",
+						"CidrIp" : "0.0.0.0/0"
+					}
+				]
+			}
+		},
+		"RootRole" : {
+			"Type" : "AWS::IAM::Role",
+			"Properties" : {
+				"AssumeRolePolicyDocument" : {
+					"Version" : "2012-10-17",
+					"Statement" : [{
+							"Effect" : "Allow",
+							"Principal" : {
+								"Service" : ["ec2.amazonaws.com"]
+							},
+							"Action" : ["sts:AssumeRole"]
+						}
+					]
+				},
+				"Path" : "/",
+				"Policies" : [{
+						"PolicyName" : "root",
+						"PolicyDocument" : {
+							"Version" : "2012-10-17",
+							"Statement" : [{
+									"Effect" : "Allow",
+									"Action" : "*",
+									"Resource" : "*"
+								}
+							]
+						}
+					}
+				]
+			}
+		},
+		"RootInstanceProfile" : {
+			"Type" : "AWS::IAM::InstanceProfile",
+			"DependsOn" : "RootRole",
+			"Properties" : {
+				"Path" : "/",
+				"Roles" : [{
+						"Ref" : "RootRole"
+					}
+				]
+			}
+		},
+		"WaitHandle01" : {
+			"Type" : "AWS::CloudFormation::WaitConditionHandle",
+			"Properties" : {}
+		},
+		"WaitCondition01" : {
+			"Type" : "AWS::CloudFormation::WaitCondition",
+			"DependsOn" : "CommandHostInstance",
+			"Properties" : {
+				"Handle" : {
+					"Ref" : "WaitHandle01"
+				},
+				"Timeout" : "3600"
+			}
+		},
+		"CommandHostInstance" : {
+			"Type" : "AWS::EC2::Instance",
+			"DependsOn" : ["RootInstanceProfile", "PublicSubnet1", "CLISecurityGroup", "AttachGateway"],
+			"Properties" : {
+				"KeyName" : {
+					"Ref" : "KeyName"
+				},
+				"IamInstanceProfile" : {
+					"Ref" : "RootInstanceProfile"
+				},
+				"ImageId" : {
+					"Ref" : "AWSAmiId"
+				},
+				"InstanceType" : "t2.medium",
+				"NetworkInterfaces" : [{
+						"DeviceIndex" : "0",
+						"AssociatePublicIpAddress" : "true",
+						"SubnetId" : {
+							"Ref" : "PublicSubnet1"
+						},
+						"GroupSet" : [{
+								"Ref" : "CLISecurityGroup"
+							}
+						]
+					}
+				],
+				"Tags" : [{
+						"Key" : "Name",
+						"Value" : {
+							"Ref" : "HostName"
+						}
+					}
+				],
+				"UserData" : {
+					"Fn::Base64" : {
+						"Fn::Join" : [
+							"",
+							[
+								"<powershell>\n",
+								"Set-ExecutionPolicy Unrestricted -Force\n",
+								"# Download and install latest stable AWS CLI MSI for 64bit\n",
+								"New-Item -ItemType directory -Path 'C:\\temp', 'C:\\temp\\aws'\n",
+								"$webclient = New-Object System.Net.WebClient\n",
+								"$webclient.DownloadFile('https://s3.amazonaws.com/aws-cli/AWSCLI64.msi','C:\\temp\\aws\\AWSCLI64.msi')\n",
+								"Start-Process 'C:\\temp\\aws\\AWSCLI64.msi' -ArgumentList /qn -Wait\n",
+								"New-Item -ItemType directory -Path 'C:\\Users\\Administrator\\.aws'\n",
+								"$ConfigSet = @\"\r\n",
+								"[default]\r\n",
+								"region = ", {
+									"Ref" : "AWS::Region"
+								}, "\n",
+								"\"@\r\n",
+								"New-Item -ItemType file -Path 'C:\\Users\\Administrator\\.aws\\config' -Value $ConfigSet\n",
+								"try {\n",
+								"$downloader = new-object net.webclient\n",
+								"# Download AWS for .NET SDK so that we have AWS Powershell commands available. \n",
+								"$downloader.DownloadFile('", {
+									"Ref" : "LabUrlPrefix"
+								}, "/lab-3-storage-windows/scripts/AWSToolsAndSDKForNet_sdk.msi', 'c:\\temp\\AWSNETSDK.msi')\n",
+								"Start-Process 'c:\\temp\\AWSNETSDK.msi' -ArgumentList /qn -Wait\n",
+
+								"# Download the ntrights.exe utility for the lab. \n",
+								"$downloader.DownloadFile('", {
+									"Ref" : "LabUrlPrefix"
+								}, "/lab-3-storage-windows/scripts/ntrights.exe', 'c:\\temp\\ntrights.exe')\n",
+
+								"# Download the snapshotter.ps1 script for the lab. \n",
+								"$downloader.DownloadFile('", {
+									"Ref" : "LabUrlPrefix"
+								}, "/lab-3-storage-windows/scripts/snapshotter.ps1', 'c:\\temp\\snapshotter.ps1')\n",
+								"} catch [Exception] {\n",
+								"$out = 'Path is us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-3-storage-windows'\n",
+								"Out-file $out\n",
+								"$_.Exception | format-list -force | Out-File -append 'C:\\temp\\init-err.log'\n",
+								"}\n",
+								"cfn-signal.exe -s true '", {
+									"Ref" : "WaitHandle01"
+								}, "'\n",
+								"</powershell>\n"
+							]
+						]
+					}
+				}
+			}
+		}
+	},
+	"Outputs" : {
+		"CommandHostIP" : {
+			"Value" : {
+				"Fn::Join" : [
+					"",
+					[
+						"{",
+						"\"Connection\": \"", {
+							"Fn::GetAtt" : [
+								"CommandHostInstance",
+								"PublicIp"
+							]
+						},
+						"\"}"
+					]
+				]
+			}
+		}
+	}
+}

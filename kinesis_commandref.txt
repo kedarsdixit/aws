@@ -1,0 +1,179 @@
+Kinesis Demo Template
+
+https://s3.amazonaws.com/kinesis-demo-bucket/amazon-kinesis-data-visualization-sample/kinesis-data-vis-sample-app.template
+
+
+Kinesis Developing  
+
+https://github.com/aws-samples/amazon-kinesis-learning/tree/learning-module-1
+
+Producer
+
+private static void sendStockTrade(StockTrade trade, AmazonKinesis kinesisClient, String streamName) {
+    byte[] bytes = trade.toJsonAsBytes();
+    // The bytes could be null if there is an issue with the JSON serialization by the Jackson JSON library.
+    if (bytes == null) {
+        LOG.warn("Could not get JSON bytes for stock trade");
+        return;
+    }
+    
+    LOG.info("Putting trade: " + trade.toString());
+    PutRecordRequest putRecord = new PutRecordRequest();
+    putRecord.setStreamName(streamName);
+    // We use the ticker symbol as the partition key, explained in the Supplemental Information section below.
+    putRecord.setPartitionKey(trade.getTickerSymbol());
+    putRecord.setData(ByteBuffer.wrap(bytes));
+
+    try {
+        kinesisClient.putRecord(putRecord);
+    } catch (AmazonClientException ex) {
+        LOG.warn("Error sending record to Amazon Kinesis.", ex);
+    }
+}
+
+Run Producer
+StockTradeStream us-west-2
+
+Consumer
+
+StockTrade trade = StockTrade.fromJsonAsBytes(record.getData().array());
+if (trade == null) {
+    LOG.warn("Skipping record. Unable to parse record into StockTrade. Partition Key: " + record.getPartitionKey());
+    return;
+}
+stockStats.addStockTrade(trade);
+
+
+reportStats
+
+System.out.println("****** Shard " + kinesisShardId + " stats for last 1 minute ******\n" +
+                   stockStats + "\n" +
+                   "****************************************************************\n");
+
+resetStats
+
+stockStats = new StockStats();
+
+
+Run Consumer
+StockTradesProcessor StockTradeStream us-west-2
+
+Optional
+If you want to know about the biggest sell orders each minute
+
+ // Ticker symbol of the stock that had the largest quantity of shares sold 
+ private String largestSellOrderStock;
+ // Quantity of shares for the largest sell order trade
+ private long largestSellOrderQuantity;
+ 
+  if (type == TradeType.SELL) {
+     if (largestSellOrderStock == null || trade.getQuantity() > largestSellOrderQuantity) {
+         largestSellOrderStock = trade.getTickerSymbol();
+         largestSellOrderQuantity = trade.getQuantity();
+     }
+ }
+ 
+  public String toString() {
+     return String.format(
+             "Most popular stock being bought: %s, %d buys.%n" +
+             "Most popular stock being sold: %s, %d sells.%n" +
+             "Largest sell order: %d shares of %s.",
+             getMostPopularStock(TradeType.BUY), getMostPopularStockCount(TradeType.BUY),
+             getMostPopularStock(TradeType.SELL), getMostPopularStockCount(TradeType.SELL),
+             largestSellOrderQuantity, largestSellOrderStock);
+ }
+ 
+ 
+ 
+ KPL/KCL
+ 
+ record 0 --|
+record 1   |        [ Aggregation ]
+    ...    |--> Amazon Kinesis record 0 --|
+    ...    |                              |
+record A --|                              |
+                                          |
+    ...                   ...             |
+                                          |
+record K --|                              |
+record L   |                              |      [ Collection ]
+    ...    |--> Amazon Kinesis record C --|--> PutRecords Request
+    ...    |                              |
+record S --|                              |
+                                          |
+    ...                   ...             |
+                                          |
+record AA--|                              |
+record BB  |                              |
+    ...    |--> Amazon Kinesis record M --|
+    ...    |
+record ZZ--|
+
+
+Producer
+
+// KinesisProducer gets credentials automatically like 
+// DefaultAWSCredentialsProviderChain. 
+// It also gets region automatically from the EC2 metadata service. 
+KinesisProducer kinesis = new KinesisProducer();  
+// Put some records 
+for (int i = 0; i < 100; ++i) {
+    ByteBuffer data = ByteBuffer.wrap("myData".getBytes("UTF-8"));
+    // doesn't block       
+    kinesis.addUserRecord("myStream", "myPartitionKey", data); 
+}  
+// Do other stuff ...
+
+
+Responding to Results
+
+KinesisProducer kinesis = new KinesisProducer();  
+
+// Put some records and save the Futures 
+List<Future<UserRecordResult>> putFutures = new LinkedList<Future<UserRecordResult>>(); 
+for (int i = 0; i < 100; i++) {
+    ByteBuffer data = ByteBuffer.wrap("myData".getBytes("UTF-8"));
+    // doesn't block 
+    putFutures.add(
+        kinesis.addUserRecord("myStream", "myPartitionKey", data)); 
+}  
+
+// Wait for puts to finish and check the results 
+for (Future<UserRecordResult> f : putFutures) {
+    UserRecordResult result = f.get(); // this does block     
+    if (result.isSuccess()) {         
+        System.out.println("Put record into shard " + 
+                            result.getShardId());     
+    } else {
+        for (Attempt attempt : result.getAttempts()) {
+            // Analyze and respond to the failure         
+        }
+    }
+}
+
+
+KCL
+
+void initialize(InitializationInput initializationInput)
+void processRecords(ProcessRecordsInput processRecordsInput)
+void shutdown(ShutdownInput shutdownInput)
+
+Worker
+
+final KinesisClientLibConfiguration config = new KinesisClientLibConfiguration(...)
+final IRecordProcessorFactory recordProcessorFactory = new RecordProcessorFactory();
+final Worker worker = new Worker(recordProcessorFactory, config);
+
+final KinesisClientLibConfiguration config = new KinesisClientLibConfiguration(...)
+final IRecordProcessorFactory recordProcessorFactory = new RecordProcessorFactory();
+final Worker worker = new Worker.Builder()
+    .recordProcessorFactory(recordProcessorFactory)
+    .config(config)
+    .build();
+
+
+ 
+ 
+ 
+ 
+ 

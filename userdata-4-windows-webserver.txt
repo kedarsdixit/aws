@@ -1,0 +1,23 @@
+<powershell>
+Set-ExecutionPolicy Unrestricted -Force
+New-Item -ItemType directory -Path 'C:\temp'
+
+# Install IIS and Web Management Tools.
+Import-Module ServerManager
+install-windowsfeature web-server, web-webserver -IncludeAllSubFeature
+install-windowsfeature web-mgmt-tools
+
+# Download the files for our web application.
+Set-Location -Path C:\inetpub\wwwroot
+
+$shell_app = new-object -com shell.application
+(New-Object System.Net.WebClient).DownloadFile("https://us-west-2-aws-training.s3.amazonaws.com/awsu-ilt/AWS-100-SYS/v2.6/lab-1-compute-windows/scripts/netapp.zip", (Get-Location).Path + "\netapp.zip")
+
+$zipfile = $shell_app.Namespace((Get-Location).Path + "\netapp.zip")
+$destination = $shell_app.Namespace((Get-Location).Path)
+$destination.copyHere($zipfile.items())
+
+# Create the web app in IIS8 .
+New-WebApplication -Name netapp -PhysicalPath c:\inetpub\wwwroot\netapp -Site "Default Web Site" -force
+</powershell>
+

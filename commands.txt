@@ -1,0 +1,11 @@
+https://s3.amazonaws.com/kinesis-demo-bucket/amazon-kinesis-data-visualization-sample/kinesis-data-vis-sample-app.template
+
+
+https://github.com/aws-samples/amazon-kinesis-data-visualization-sample
+
+https://aws.amazon.com/blogs/big-data/building-and-maintaining-an-amazon-s3-metadata-index-without-servers/ (s3/ddb/lambda)
+
+Hive/EMR_GS
+
+https://amazon.qwiklabs.com/focuses/2988 (Redshift)
+
